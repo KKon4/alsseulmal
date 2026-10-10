@@ -1,0 +1,1028 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>알쓸말 프로토타입</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: neutral stage with a 390×820 phone centered; controls beside it on desktop, a slim strip above it on narrow viewports. */
+:root{
+  --bg:#F7F5EF; --surface:#FDFCF9; --surface-2:#EEEAE0;
+  --ink:#1C2331; --body:#3F4654; --muted:#5C6370;
+  --accent:#B8501F; --accent-soft:#FBE9DD; --on-accent:#FFFFFF;
+  --teal:#256A7A; --teal-soft:#DCEBEE;
+  --yellow:#F6E27A; --on-yellow:#1C2331;
+  --danger:#A83A2E; --danger-soft:#F8E3DF;
+  --border:#DDD7C8; --frame:#1C2331;
+  --inv-bg:#1C2331; --inv-fg:#F7F5EF; --inv-muted:#AEB6C2; --inv-accent:#E8894F; --inv-border:#3A4556;
+  --shadow:0 32px 64px -24px rgba(28,35,49,.38), 0 8px 20px -10px rgba(28,35,49,.2);
+  --font:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15191F; --surface:#1C2331; --surface-2:#262F3D;
+    --ink:#F7F5EF; --body:#D5DAE1; --muted:#AEB6C2;
+    --accent:#E8894F; --accent-soft:#3A2A21; --on-accent:#15191F;
+    --teal:#7FC1CF; --teal-soft:#1F3A42;
+    --yellow:#F6E27A; --on-yellow:#1C2331;
+    --danger:#E8847A; --danger-soft:#3B2524;
+    --border:#2E3847; --frame:#3A4556;
+    --inv-bg:#0F1319; --inv-fg:#F7F5EF; --inv-muted:#AEB6C2; --inv-accent:#E8894F; --inv-border:#3A4556;
+    --shadow:0 32px 64px -24px rgba(0,0,0,.7), 0 8px 20px -10px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15191F; --surface:#1C2331; --surface-2:#262F3D;
+  --ink:#F7F5EF; --body:#D5DAE1; --muted:#AEB6C2;
+  --accent:#E8894F; --accent-soft:#3A2A21; --on-accent:#15191F;
+  --teal:#7FC1CF; --teal-soft:#1F3A42;
+  --yellow:#F6E27A; --on-yellow:#1C2331;
+  --danger:#E8847A; --danger-soft:#3B2524;
+  --border:#2E3847; --frame:#3A4556;
+  --inv-bg:#0F1319; --inv-fg:#F7F5EF; --inv-muted:#AEB6C2; --inv-accent:#E8894F; --inv-border:#3A4556;
+  --shadow:0 32px 64px -24px rgba(0,0,0,.7), 0 8px 20px -10px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+img,svg{max-width:100%}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--body);
+  font-family:var(--font); font-size:15px; line-height:1.5;
+  padding-inline:16px; padding-block:24px;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit; color:inherit; cursor:pointer; background:none; border:0; padding:0; margin:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible,[role="switch"]:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{text-wrap:balance; color:var(--ink)}
+
+/* ---------- Stage (outside the phone) ---------- */
+.stage{min-height:100%; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:32px 48px; max-width:980px; margin:0 auto}
+.aside{display:flex; flex-direction:column; gap:12px; max-width:300px; min-width:0}
+.aside .eyebrow{font-size:14px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:700}
+.aside .caption{font-size:16px; color:var(--ink); font-weight:500; line-height:1.5}
+.aside .ctrl{display:flex; flex-direction:column; gap:8px; margin-top:4px}
+.aside .hint{font-size:14px; color:var(--muted)}
+.phone-col{display:flex; flex-direction:column; align-items:center; gap:14px; min-width:0; max-width:100%}
+.captionbar{
+  width:390px; max-width:100%; min-height:44px; display:flex; align-items:center; justify-content:center; text-align:center;
+  padding:8px 16px; border-radius:12px; background:var(--surface-2); color:var(--ink); font-size:15px; font-weight:500;
+  transition:opacity .2s;
+}
+.captionbar:empty{opacity:0}
+#demoBar{position:fixed; top:env(safe-area-inset-top,0px); left:0; height:3px; width:0; background:var(--accent); z-index:60; transition:width .25s linear}
+#demoBar[hidden]{display:none}
+
+/* ---------- Phone frame ---------- */
+.phone{
+  position:relative; width:390px; height:820px; max-width:100%; flex:none;
+  border:8px solid var(--frame); border-radius:44px; background:var(--surface); box-shadow:var(--shadow);
+  overflow:hidden; display:flex; flex-direction:column; color:var(--body);
+}
+.statusbar{height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 28px; font-size:15px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; background:var(--surface)}
+.statusbar .sig{display:flex; align-items:center; gap:8px}
+.statusbar .dots{display:flex; gap:3px; align-items:flex-end}
+.statusbar .dots i{display:block; width:5px; height:5px; border-radius:50%; background:var(--ink)}
+.statusbar .batt{width:24px; height:12px; border:1.5px solid var(--ink); border-radius:4px; padding:2px; position:relative}
+.statusbar .batt::before{content:""; display:block; height:100%; width:80%; background:var(--ink); border-radius:1px}
+.statusbar .batt::after{content:""; position:absolute; right:-4px; top:3px; width:2px; height:4px; background:var(--ink); border-radius:1px}
+.screens{position:relative; flex:1; min-height:0; background:var(--bg)}
+.screen{position:absolute; inset:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:12px 16px 28px; display:none; scrollbar-width:thin}
+.screen.active{display:block; animation:screenIn .2s ease-out}
+@keyframes screenIn{from{opacity:0; transform:translateX(14px)} to{opacity:1; transform:none}}
+.screen.center{display:none; place-items:center; text-align:center}
+.screen.center.active{display:grid}
+
+/* ---------- Tab bar ---------- */
+.tabbar{flex:none; height:64px; display:grid; grid-template-columns:repeat(4,1fr); background:var(--surface); border-top:1px solid var(--border); padding:0 8px}
+.tabbar[hidden]{display:none}
+.tab{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--muted); font-size:14px; font-weight:500; min-height:44px; border-radius:12px}
+.tab svg{width:22px; height:22px}
+.tab.on{color:var(--accent); font-weight:700}
+
+/* ---------- Narrow viewport: phone fills the screen ---------- */
+@media (max-width:430px){
+  body{padding:0}
+  .stage{display:block; min-height:0}
+  .aside{max-width:none; flex-direction:row; align-items:center; gap:8px; height:52px; padding:0 12px; border-bottom:1px solid var(--border); background:var(--surface)}
+  .aside .eyebrow,.aside .caption,.aside .hint,.aside .dur{display:none}
+  .aside .ctrl{flex-direction:row; margin:0; width:100%}
+  .aside .ctrl .btn{flex:1; min-height:40px; font-size:14px; padding:0 8px; white-space:normal; line-height:1.2}
+  .aside .ctrl .btn.primary{flex:1.6}
+  .phone-col{gap:0}
+  .phone{width:100%; height:calc(100svh - 52px); border:0; border-radius:0; box-shadow:none}
+  .captionbar{display:none}
+}
+/* ---------- Shared components ---------- */
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 16px; border-radius:12px; font-weight:700; font-size:15px; border:1px solid var(--border); background:var(--surface); color:var(--ink); transition:transform .08s, background .15s, color .15s; white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent); color:var(--on-accent); border-color:transparent}
+.btn.full{width:100%}
+.btn.ghost{background:transparent}
+.btn.soft{background:var(--accent-soft); color:var(--accent); border-color:transparent}
+.btn.teal{background:var(--teal); color:var(--surface); border-color:transparent}
+.btn:disabled{opacity:.55; cursor:default}
+.appbar{display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:48px; margin-bottom:8px}
+.appbar h2{font-size:20px; font-weight:900; letter-spacing:-.01em}
+.appbar .sub{font-size:14px; color:var(--muted); font-weight:500}
+.iconbtn{width:44px; height:44px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:var(--ink); flex:none}
+.iconbtn svg{width:22px; height:22px}
+.iconbtn.back{margin-left:-10px}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px}
+#loading,#result{margin-top:12px}
+.stack{display:flex; flex-direction:column; gap:12px}
+.row{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.label{font-size:14px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted)}
+.label.ko{text-transform:none; letter-spacing:0}
+.chip{display:inline-flex; align-items:center; gap:4px; min-height:36px; padding:0 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:14px; font-weight:500; transition:background .15s,color .15s,border-color .15s}
+.chip.on{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.chip.lg{min-height:44px; font-size:15px}
+.tag{display:inline-flex; align-items:center; min-height:26px; padding:0 10px; border-radius:8px; font-size:14px; font-weight:700; background:var(--surface-2); color:var(--body)}
+.tag.accent{background:var(--accent-soft); color:var(--accent)}
+.tag.teal{background:var(--teal-soft); color:var(--teal)}
+.tag.danger{background:var(--danger-soft); color:var(--danger)}
+.tag.yellow{background:var(--yellow); color:var(--on-yellow)}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.ink{color:var(--ink)}
+.toast{position:absolute; left:50%; bottom:16px; transform:translateX(-50%) translateY(12px); background:var(--inv-bg); color:var(--inv-fg); padding:12px 18px; border-radius:999px; font-size:14px; font-weight:700; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:20; white-space:nowrap; max-width:calc(100% - 32px); text-overflow:ellipsis; overflow:hidden}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+textarea,input[type="text"],input[type="search"]{width:100%; font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; font-size:16px; line-height:1.5; resize:none; min-width:0}
+textarea::placeholder,input::placeholder{color:var(--muted)}
+.progress{height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden}
+.progress > i{display:block; height:100%; width:0; background:var(--accent); border-radius:inherit; transition:width .4s ease}
+.progress.teal > i{background:var(--teal)}
+.divider{height:1px; background:var(--border); margin:4px 0}
+@keyframes shake{10%,90%{transform:translateX(-2px)} 20%,80%{transform:translateX(4px)} 30%,50%,70%{transform:translateX(-6px)} 40%,60%{transform:translateX(6px)}}
+.shake{animation:shake .5s}
+@keyframes popIn{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+.pop{animation:popIn .3s ease-out}
+.loadingdots{display:inline-flex; gap:5px; align-items:center; justify-content:center; min-height:44px}
+.loadingdots i{width:7px; height:7px; border-radius:50%; background:var(--accent); animation:blink 1s infinite}
+.loadingdots i:nth-child(2){animation-delay:.2s} .loadingdots i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25} 40%{opacity:1}}
+.caret::after{content:"▍"; color:var(--accent); animation:blink .8s infinite}
+
+/* ---------- Splash ---------- */
+#splash{background:var(--inv-bg); color:var(--inv-fg)}
+#splash .mark{font-size:56px; font-weight:900; letter-spacing:-.03em; color:var(--inv-fg); line-height:1.1}
+#splash .mark b{color:var(--inv-accent)}
+#splash .tag1{font-size:20px; font-weight:500; margin-top:14px; color:var(--inv-fg)}
+#splash .tag2{font-size:14px; margin-top:8px; color:var(--inv-muted)}
+#splash .ring{width:76px; height:76px; border-radius:24px; background:var(--inv-accent); display:grid; place-items:center; margin:0 auto 26px; font-size:34px; font-weight:900; color:var(--inv-bg); transform:rotate(-6deg)}
+
+/* ---------- Onboarding ---------- */
+.ob h2{font-size:24px; font-weight:900; letter-spacing:-.01em; margin-top:16px}
+.ob .lead{font-size:15px; color:var(--muted); margin-top:6px}
+.ob .group{margin-top:20px}
+.ob .group .label{margin-bottom:10px; display:block}
+.ob .chips{display:flex; flex-wrap:wrap; gap:8px}
+.ob .foot{margin-top:28px}
+.steps{display:flex; gap:6px}
+.steps i{display:block; width:28px; height:4px; border-radius:2px; background:var(--border)}
+.steps i.on{background:var(--accent)}
+
+/* ---------- Translate ---------- */
+.pair{display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 6px 0 4px; border-radius:999px; background:var(--surface-2); color:var(--ink); font-size:14px; font-weight:700}
+.pair .me,.pair .you{padding:5px 10px; border-radius:999px; background:var(--surface)}
+.pair .you{background:var(--accent-soft); color:var(--accent)}
+.pair .arrow{color:var(--muted)}
+.modes{display:grid; grid-template-columns:repeat(3,1fr); gap:4px; background:var(--surface-2); border-radius:12px; padding:4px; margin-top:10px}
+.modes button{min-height:44px; border-radius:9px; font-size:14px; font-weight:700; color:var(--muted)}
+.modes button.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.wave{display:flex; align-items:center; justify-content:center; gap:4px; height:64px; margin-top:10px}
+.wave i{display:block; width:5px; height:12px; border-radius:3px; background:var(--accent); animation:wave 1s ease-in-out infinite}
+.wave i:nth-child(2n){animation-delay:.15s} .wave i:nth-child(3n){animation-delay:.3s} .wave i:nth-child(5n){animation-delay:.45s} .wave i:nth-child(7n){animation-delay:.6s}
+@keyframes wave{0%,100%{height:10px} 50%{height:44px}}
+.filerow{display:flex; align-items:center; gap:12px; margin-top:10px; padding:12px; border-radius:12px; background:var(--surface-2)}
+.filerow .ico{width:40px; height:40px; border-radius:10px; background:var(--teal-soft); color:var(--teal); display:grid; place-items:center; font-weight:900; font-size:14px; flex:none}
+.filerow .meta{flex:1; min-width:0}
+.filerow .name{font-weight:700; color:var(--ink); font-size:15px}
+.filerow .progress{margin-top:8px}
+.result{border-color:var(--accent); background:var(--surface); position:relative}
+.result .out{font-size:22px; font-weight:700; color:var(--ink); line-height:1.4; margin-top:8px; min-height:1.4em}
+.result .meta{margin-top:12px; display:flex; flex-direction:column; gap:6px; font-size:14px}
+.result .meta b{color:var(--ink); font-weight:700}
+.result .actions{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px}
+.result .copy{position:absolute; top:14px; right:14px; font-size:14px; color:var(--accent); font-weight:700; min-height:28px; padding:0 6px}
+
+/* ---------- Context ---------- */
+.quote{font-size:24px; font-weight:900; color:var(--ink); letter-spacing:-.01em; line-height:1.3}
+.quote::before{content:"“"; color:var(--accent); margin-right:2px}
+.quote::after{content:"”"; color:var(--accent); margin-left:2px}
+.cmp{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.cmp .card{padding:14px}
+.cmp .who{font-size:14px; color:var(--muted); font-weight:700}
+.cmp .val{font-size:16px; font-weight:700; color:var(--ink); margin-top:6px; line-height:1.4}
+.cmp .tag{margin-top:10px}
+.dark{background:var(--inv-bg); color:var(--inv-fg); border-color:var(--inv-bg)}
+.dark .label{color:var(--inv-accent)}
+.dark .big{font-size:17px; font-weight:700; margin-top:8px; line-height:1.45; color:var(--inv-fg)}
+.dark .chip{background:transparent; border-color:var(--inv-border); color:var(--inv-fg); min-height:32px; font-size:14px}
+.acc{width:100%; display:flex; align-items:center; justify-content:space-between; min-height:44px; text-align:left; font-weight:700; color:var(--ink); font-size:15px}
+.acc .chev{transition:transform .2s; color:var(--muted)}
+.acc[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.accbody{display:grid; gap:8px; padding-top:8px}
+.accbody[hidden]{display:none}
+.kv{display:flex; gap:10px; align-items:baseline; font-size:15px}
+.kv b{flex:none; width:56px; color:var(--teal)}
+
+/* ---------- Learn ---------- */
+.flash{border-radius:22px; padding:20px; background:var(--surface); border:1px solid var(--border); box-shadow:0 10px 24px -18px rgba(28,35,49,.35)}
+.flash .word{font-size:40px; font-weight:900; color:var(--ink); letter-spacing:-.02em; line-height:1.1; margin-top:10px}
+.flash .mean{font-size:15px; color:var(--body); margin-top:8px}
+.flash .q{font-size:15px; font-weight:700; color:var(--accent); margin-top:18px}
+.flash .opts{display:grid; gap:8px; margin-top:10px}
+.opt{min-height:52px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:16px; font-weight:700; text-align:left; padding:10px 14px; transition:background .15s,color .15s,border-color .15s}
+.opt.correct{background:var(--teal); color:var(--surface); border-color:var(--teal)}
+.opt.wrong{border-color:var(--danger); color:var(--danger); background:var(--danger-soft)}
+.feedback{min-height:22px; font-size:14px; margin-top:10px; color:var(--teal); font-weight:700}
+.feedback.bad{color:var(--danger)}
+.yellowrow{display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--yellow); color:var(--on-yellow); border-radius:14px; padding:14px 16px; font-weight:700; font-size:15px; width:100%; text-align:left; min-height:52px; margin-top:12px}
+.yellowrow span{min-width:0}
+.streak{display:flex; align-items:center; justify-content:space-between; font-size:14px; color:var(--muted); font-weight:700}
+.streak b{color:var(--ink); font-variant-numeric:tabular-nums}
+
+/* ---------- Dictionary ---------- */
+.search{position:relative}
+.search svg{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--muted)}
+.search input{padding-left:40px}
+.terms{display:flex; flex-direction:column; gap:8px; margin-top:12px; padding-bottom:64px}
+.term{display:flex; align-items:center; gap:12px; padding:14px; background:var(--surface); border:1px solid var(--border); border-radius:14px}
+.term .t{font-size:17px; font-weight:900; color:var(--ink)}
+.term .m{font-size:14px; color:var(--body); margin-top:2px}
+.term .body{flex:1; min-width:0}
+.term.new{border-color:var(--teal)}
+.sticky{position:sticky; bottom:0; padding-top:10px; padding-bottom:2px; background:linear-gradient(to top,var(--bg) 70%,transparent); margin-top:-64px}
+.empty{padding:24px; text-align:center; color:var(--muted); font-size:14px}
+
+/* ---------- Community ---------- */
+.switch{width:50px; height:30px; border-radius:999px; background:var(--border); position:relative; flex:none; transition:background .2s}
+.switch::after{content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:var(--surface); transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.switch[aria-checked="true"]{background:var(--teal)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+.qcard{background:var(--surface-2); border-color:transparent}
+.qcard .q{font-size:18px; font-weight:700; color:var(--ink); line-height:1.4}
+.ai{border-style:dashed; border-color:var(--border)}
+.ai .label{display:flex; align-items:center; gap:6px}
+.ai .conf{font-weight:500; text-transform:none; letter-spacing:0}
+.ans{border-color:var(--teal)}
+.ans .who{display:flex; align-items:center; gap:10px}
+.avatar{width:40px; height:40px; border-radius:50%; background:var(--teal); color:var(--surface); display:grid; place-items:center; font-weight:900; font-size:16px; flex:none}
+.ans .name{font-weight:700; color:var(--ink); font-size:15px}
+.ans .txt{margin-top:12px; font-size:16px; line-height:1.55; color:var(--ink)}
+.ans .actions{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px}
+.waiting{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:14px; padding:4px 2px}
+.waiting .loadingdots{min-height:24px}
+
+/* ---------- Settings ---------- */
+.list{display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:16px; overflow:hidden}
+.list .item{display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:56px; padding:0 16px; border-bottom:1px solid var(--border); font-size:16px; color:var(--ink); font-weight:500}
+.list .item:last-child{border-bottom:0}
+.list .item .v{font-size:14px; color:var(--muted); font-weight:500}
+.list .item.danger{color:var(--danger)}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important}
+}
+</style>
+<div id="demoBar" hidden></div>
+<div class="stage">
+  <div class="aside">
+    <div class="eyebrow">Slang ↔ Slang</div>
+    <div class="caption">알쓸말 워킹 프로토타입 — 클릭해서 흐름을 따라가 보세요</div>
+    <div class="ctrl">
+      <button class="btn primary" id="btnDemo" type="button">▶ 데모 자동 재생 <span class="dur">(약 45초)</span></button>
+      <button class="btn" id="btnStop" type="button" hidden>■ 중지</button>
+      <button class="btn" id="btnReset" type="button">↺ 처음으로</button>
+    </div>
+    <div class="hint">자동 재생 중에는 실제 화면이 순서대로 진행되고, 아래 자막이 함께 바뀝니다.</div>
+  </div>
+
+  <div class="phone-col">
+    <div class="phone" id="phone">
+      <div class="statusbar" id="statusbar">
+        <span>9:41</span>
+        <span class="sig"><span class="dots"><i></i><i></i><i></i><i></i></span><span class="batt"></span></span>
+      </div>
+
+      <div class="screens" id="screens">
+
+        <!-- 1. Splash -->
+        <section class="screen center" id="splash" data-caption="" data-tab="">
+          <div>
+            <div class="ring">말</div>
+            <div class="mark">알쓸<b>말</b></div>
+            <div class="tag1">아는 척 대신 알아듣기</div>
+            <div class="tag2">Slang ↔ Slang 맥락 번역</div>
+          </div>
+        </section>
+
+        <!-- 2. Onboarding 1 -->
+        <section class="screen ob" id="onboarding-1" data-caption="① 나와 상대의 집단을 고릅니다" data-tab="">
+          <div class="steps"><i class="on"></i><i></i></div>
+          <h2>나는 어떤 말을 쓰나요?</h2>
+          <p class="lead">내 집단을 고르면 상대의 말을 내 말로 바꿔 드려요.</p>
+          <div class="group">
+            <span class="label ko">세대</span>
+            <div class="chips" data-group="me-gen" data-single="true">
+              <button class="chip lg" type="button">10대</button>
+              <button class="chip lg on" type="button">20대</button>
+              <button class="chip lg" type="button">30대</button>
+              <button class="chip lg" type="button">40대</button>
+              <button class="chip lg" type="button">50대+</button>
+            </div>
+          </div>
+          <div class="group">
+            <span class="label ko">조직</span>
+            <div class="chips" data-group="me-org">
+              <button class="chip lg" type="button">개발팀</button>
+              <button class="chip lg" type="button">영업팀</button>
+              <button class="chip lg" type="button">기획팀</button>
+              <button class="chip lg on" type="button">신입/이직</button>
+            </div>
+          </div>
+          <div class="foot"><button class="btn primary full" type="button" data-go="onboarding-2">다음</button></div>
+        </section>
+
+        <!-- 3. Onboarding 2 -->
+        <section class="screen ob" id="onboarding-2" data-caption="① 나와 상대의 집단을 고릅니다" data-tab="">
+          <div class="steps"><i class="on"></i><i class="on"></i></div>
+          <h2>누구의 말을 알아듣고 싶나요?</h2>
+          <p class="lead">상대 집단의 말로 다시 표현해 드려요. 뜻풀이가 아니라요.</p>
+          <div class="group">
+            <span class="label ko">세대</span>
+            <div class="chips" data-group="you-gen" data-single="true">
+              <button class="chip lg" type="button">10대</button>
+              <button class="chip lg" type="button">20대</button>
+              <button class="chip lg" type="button">30대</button>
+              <button class="chip lg" type="button">40대</button>
+              <button class="chip lg on" type="button">50대+</button>
+            </div>
+          </div>
+          <div class="group">
+            <span class="label ko">조직</span>
+            <div class="chips" data-group="you-org">
+              <button class="chip lg on" type="button">개발팀</button>
+              <button class="chip lg" type="button">영업팀</button>
+              <button class="chip lg" type="button">기획팀</button>
+              <button class="chip lg" type="button">신입/이직</button>
+            </div>
+          </div>
+          <div class="group">
+            <span class="label ko">국가</span>
+            <div class="chips" data-group="you-lang" data-single="true">
+              <button class="chip lg on" type="button">한국어</button>
+              <button class="chip lg" type="button">English (Gen Z)</button>
+              <button class="chip lg" type="button">日本語</button>
+            </div>
+          </div>
+          <div class="foot"><button class="btn primary full" type="button" data-go="translate">시작하기</button></div>
+        </section>
+
+        <!-- 4. Translate -->
+        <section class="screen" id="translate" data-caption="② 음성·녹음·타이핑 어떤 입력도 OK" data-tab="translate">
+          <div class="appbar">
+            <button class="pair" type="button" data-go="onboarding-2" aria-label="집단 바꾸기">
+              <span class="me">20대 (나)</span><span class="arrow">→</span><span class="you">50대 팀장</span>
+            </button>
+            <button class="iconbtn" type="button" data-go="settings" aria-label="설정">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            </button>
+          </div>
+
+          <div class="card">
+            <span class="label ko">내 말 (20대 · 신입)</span>
+            <textarea id="srcText" rows="3" style="margin-top:8px" aria-label="번역할 문장">폼 미쳤다 ㅋㅋ 오늘 완전 찢었음</textarea>
+            <div class="modes" id="modes" role="tablist" aria-label="입력 방식">
+              <button type="button" data-mode="voice" role="tab" aria-selected="false">🎤 음성</button>
+              <button type="button" data-mode="file" role="tab" aria-selected="false">📁 녹음</button>
+              <button type="button" data-mode="type" class="on" role="tab" aria-selected="true">⌨ 타이핑</button>
+            </div>
+            <div id="voicePanel" hidden>
+              <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <p class="small muted" style="text-align:center" id="voiceStatus">듣는 중…</p>
+            </div>
+            <div id="filePanel" hidden>
+              <div class="filerow">
+                <div class="ico">m4a</div>
+                <div class="meta">
+                  <div class="name">회의_1008.m4a · 2:14</div>
+                  <div class="progress"><i id="fileProg"></i></div>
+                </div>
+              </div>
+              <p class="small muted" id="fileStatus" style="margin-top:8px">전사 중…</p>
+            </div>
+            <button class="btn primary full" type="button" id="btnTranslate" style="margin-top:12px">번역하기</button>
+          </div>
+
+          <div id="loading" class="loadingdots" style="width:100%" hidden aria-label="번역 중"><i></i><i></i><i></i></div>
+
+          <div class="card result pop" id="result" hidden>
+            <button class="copy" type="button" id="btnCopy">복사</button>
+            <span class="label ko">50대 팀장 말로</span>
+            <div class="out" id="outText"></div>
+            <div class="meta">
+              <div id="metaMean"><b>뜻:</b> 실력이 최고조 · <b>분위기:</b> 감탄</div>
+              <div id="metaEn"><b>EN (Gen Z):</b> he's cooking today</div>
+            </div>
+            <div class="actions">
+              <button class="btn soft" type="button" data-go="context">맥락 더 보기</button>
+              <button class="btn" type="button" data-toast="학습 카드에 저장했어요">학습 카드에 저장</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Context -->
+        <section class="screen" id="context" data-caption="④ 같은 말, 다른 뜻을 알려줍니다" data-tab="context">
+          <div class="appbar">
+            <div>
+              <h2>맥락 해설</h2>
+              <div class="sub">같은 말, 다른 뜻</div>
+            </div>
+            <button class="iconbtn" type="button" data-go="settings" aria-label="설정">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            </button>
+          </div>
+          <div class="stack">
+            <div class="card">
+              <span class="label ko">팀장이 한 말</span>
+              <div class="quote" style="margin-top:8px">검토해 보겠습니다.</div>
+              <p class="small muted" style="margin-top:10px">이 말은 조직마다 다릅니다</p>
+            </div>
+            <div class="cmp">
+              <div class="card">
+                <div class="who">지금 조직 (팀장 → 나)</div>
+                <div class="val">사실상 거절 (설득 필요)</div>
+                <span class="tag danger">완곡한 거절</span>
+              </div>
+              <div class="card">
+                <div class="who">이전 직장</div>
+                <div class="val">긍정 검토 (회신 대기)</div>
+                <span class="tag teal">긍정</span>
+              </div>
+            </div>
+            <div class="card dark">
+              <span class="label ko">추천 대응</span>
+              <div class="big">상황: 예산 요청 → 대안 2개를 함께 제시</div>
+              <div class="row" style="margin-top:12px">
+                <span class="chip">관계: 팀장→팀원</span>
+                <span class="chip">분위기: 신중</span>
+              </div>
+            </div>
+            <div class="card">
+              <button class="acc" type="button" id="accBtn" aria-expanded="false" aria-controls="accBody">
+                <span>또 다른 예: “스파이크 쳤다”</span>
+                <svg class="chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="accbody" id="accBody" hidden>
+                <div class="kv"><b>개발팀</b><span>배포 후 지표 급등 (긍정)</span></div>
+                <div class="kv"><b>영업팀</b><span>문의 폭주 (바쁨)</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. Learn -->
+        <section class="screen" id="learn" data-caption="⑤ 카드로 익힙니다" data-tab="learn">
+          <div class="appbar">
+            <div>
+              <h2>오늘의 학습</h2>
+              <div class="sub" id="learnSub">3/5 완료 · 연속 7일</div>
+            </div>
+            <button class="iconbtn" type="button" data-go="settings" aria-label="설정">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            </button>
+          </div>
+          <div class="progress" style="margin-bottom:16px"><i id="learnProg" style="width:60%"></i></div>
+
+          <div class="flash" id="flash">
+            <span class="label ko" id="flashLabel">단어 카드 · 20대 말 → 50대 말</span>
+            <div class="word" id="flashWord">찢었다</div>
+            <div class="mean" id="flashMean">뜻: 압도적으로 잘했다</div>
+            <div class="q" id="flashQ">50대 말로는?</div>
+            <div class="opts" id="flashOpts">
+              <button class="opt" type="button" data-correct="true">물이 올랐다</button>
+              <button class="opt" type="button" data-correct="false">큰일 났다</button>
+            </div>
+            <div class="feedback" id="flashFeedback"></div>
+            <button class="btn full" type="button" id="btnNextCard" style="margin-top:10px" hidden>다음 카드</button>
+          </div>
+
+          <button class="yellowrow" type="button" id="btnSentence">
+            <span>문장 학습: ‘이번 분기 KPI 터졌어요’ → 영업팀 말로</span><span aria-hidden="true">▸</span>
+          </button>
+        </section>
+
+        <!-- 7. Dictionary -->
+        <section class="screen" id="dictionary" data-caption="⑥ 신조어는 AI 먼저, 사람이 검증" data-tab="dictionary">
+          <div class="appbar">
+            <div>
+              <h2>우리 조직 말 사전</h2>
+              <div class="sub">검증된 말 <b id="dictCount">4</b>개</div>
+            </div>
+            <button class="iconbtn" type="button" data-go="settings" aria-label="설정">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            </button>
+          </div>
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="search" id="dictSearch" placeholder="말 검색 (예: 스파이크)" aria-label="사전 검색">
+          </div>
+          <div class="terms" id="terms"></div>
+          <div class="sticky"><button class="btn primary full" type="button" data-go="community-ask">모르는 말 질문하기</button></div>
+        </section>
+
+        <!-- 8. Community ask -->
+        <section class="screen" id="community-ask" data-caption="⑥ 신조어는 AI 먼저, 사람이 검증" data-tab="dictionary">
+          <div class="appbar">
+            <div class="row" style="gap:2px">
+              <button class="iconbtn back" type="button" data-go="dictionary" aria-label="뒤로">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <h2>커뮤니티에 묻기</h2>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="card">
+              <span class="label ko">질문</span>
+              <textarea id="askText" rows="3" style="margin-top:8px" aria-label="질문 내용">'럭키비키'가 뭐예요? 팀 단톡에서 나왔어요</textarea>
+            </div>
+            <div class="card">
+              <div class="row" style="justify-content:space-between">
+                <span class="small ink" style="font-weight:700">이 질문을 받을 집단</span>
+                <span class="chip on">20대 네이티브 3명</span>
+              </div>
+              <div class="divider" style="margin:12px 0"></div>
+              <div class="row" style="justify-content:space-between">
+                <span class="small ink" style="font-weight:700">익명으로 질문</span>
+                <button class="switch" type="button" role="switch" aria-checked="true" aria-label="익명으로 질문"></button>
+              </div>
+            </div>
+            <p class="small muted">AI가 먼저 잠정 답을 드리고, 인증된 멤버가 확인하면 사전에 올라가요.</p>
+            <button class="btn primary full" type="button" id="btnAsk">질문 보내기</button>
+          </div>
+        </section>
+
+        <!-- 9. Community answer -->
+        <section class="screen" id="community-answer" data-caption="⑥ 신조어는 AI 먼저, 사람이 검증" data-tab="dictionary">
+          <div class="appbar">
+            <div class="row" style="gap:2px">
+              <button class="iconbtn back" type="button" data-go="dictionary" aria-label="뒤로">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <h2>답변</h2>
+            </div>
+            <span class="tag">익명 · 20대</span>
+          </div>
+          <div class="stack">
+            <div class="card qcard">
+              <span class="label ko">내 질문</span>
+              <div class="q" id="answerQ" style="margin-top:6px">'럭키비키'가 뭐예요? 팀 단톡에서 나왔어요</div>
+            </div>
+            <div class="card ai pop">
+              <span class="label ko">AI 잠정 답변 <span class="conf muted">· 확신도 낮음</span></span>
+              <p style="margin-top:8px; color:var(--ink)">‘럭키비키’ ≈ 원영적 사고: 안 좋은 일도 ‘완전 럭키비키잖아’로 긍정 해석 (2024 신조어)</p>
+            </div>
+            <div class="waiting" id="waiting">
+              <span class="loadingdots"><i></i><i></i><i></i></span>
+              <span>20대 네이티브가 확인 중…</span>
+            </div>
+            <div class="card ans pop" id="verified" hidden>
+              <div class="who">
+                <div class="avatar">민</div>
+                <div style="min-width:0">
+                  <div class="name">20대 네이티브 Lv.3</div>
+                  <span class="tag teal" style="margin-top:2px">검증됨</span>
+                </div>
+              </div>
+              <p class="txt">맞아요. 밈에서 온 말이고, 단톡에선 ‘그래도 다행이다’ 정도의 가벼운 긍정이에요. 50대 말로는 ‘전화위복이네’ 느낌.</p>
+              <div class="actions">
+                <button class="btn teal" type="button" id="btnAdopt">채택 (+보상)</button>
+                <button class="btn" type="button" id="btnAddDict">사전에 추가</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 10. Settings -->
+        <section class="screen" id="settings" data-caption="" data-tab="">
+          <div class="appbar">
+            <div class="row" style="gap:2px">
+              <button class="iconbtn back" type="button" data-go="translate" aria-label="뒤로">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <h2>설정</h2>
+            </div>
+          </div>
+          <div class="list">
+            <div class="item"><span>내 집단</span><span class="v">20대 · 신입/이직</span></div>
+            <div class="item"><span>상대 집단</span><span class="v">50대+ · 개발팀</span></div>
+            <div class="item"><span>알림</span><span class="v">켜짐</span></div>
+            <div class="item"><span>구독</span><span class="v">개인 월 4,900원</span></div>
+            <div class="item danger"><span>로그아웃</span><span></span></div>
+          </div>
+          <p class="small muted" style="margin-top:12px">프로토타입: 설정 항목은 표시만 됩니다.</p>
+        </section>
+
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </div>
+
+      <nav class="tabbar" id="tabbar" aria-label="주요 탭">
+        <button class="tab on" type="button" data-tab="translate" data-go="translate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M6 12c2.5-1.5 4-4 4.5-7M5 12c1.5-1.5 3-4 3.5-7"/><path d="m13 21 4-9 4 9M14.5 17.5h5"/></svg>
+          <span>번역</span>
+        </button>
+        <button class="tab" type="button" data-tab="context" data-go="context">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h9l5 5v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 13h8M8 17h5"/></svg>
+          <span>해설</span>
+        </button>
+        <button class="tab" type="button" data-tab="learn" data-go="learn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M7 3h13a1 1 0 0 1 1 1v12"/><path d="M7 12h6"/></svg>
+          <span>학습</span>
+        </button>
+        <button class="tab" type="button" data-tab="dictionary" data-go="dictionary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z"/><path d="M4 18a2 2 0 0 1 2-2h12"/><path d="M8 8h6"/></svg>
+          <span>사전</span>
+        </button>
+      </nav>
+    </div>
+    <div class="captionbar" id="captionbar" aria-live="polite"></div>
+  </div>
+</div>
+<script>
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+  var $$ = function(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); };
+
+  /* ---------- timer registry (everything cancellable by reset/stop) ---------- */
+  var timers = new Set();
+  function later(fn, ms){
+    var id = setTimeout(function(){ timers.delete(id); try{ fn(); }catch(e){ console.error(e); } }, ms);
+    timers.add(id); return id;
+  }
+  function every(fn, ms){ var id = setInterval(fn, ms); timers.add(id); return id; }
+  function cancel(id){ clearTimeout(id); clearInterval(id); timers.delete(id); }
+  function clearTimers(){ timers.forEach(function(id){ clearTimeout(id); clearInterval(id); }); timers.clear(); }
+
+  /* ---------- elements ---------- */
+  var screens = $$('.screen');
+  var tabbar = $('tabbar'), captionbar = $('captionbar'), toastEl = $('toast');
+  var srcText = $('srcText'), modes = $('modes'), voicePanel = $('voicePanel'), voiceStatus = $('voiceStatus');
+  var filePanel = $('filePanel'), fileProg = $('fileProg'), fileStatus = $('fileStatus');
+  var btnTranslate = $('btnTranslate'), loading = $('loading'), result = $('result'), outText = $('outText');
+  var metaMean = $('metaMean'), metaEn = $('metaEn'), btnCopy = $('btnCopy');
+  var accBtn = $('accBtn'), accBody = $('accBody');
+  var learnSub = $('learnSub'), learnProg = $('learnProg'), flashLabel = $('flashLabel'), flashWord = $('flashWord');
+  var flashMean = $('flashMean'), flashQ = $('flashQ'), flashOpts = $('flashOpts'), flashFeedback = $('flashFeedback'), btnNextCard = $('btnNextCard'), flash = $('flash');
+  var termsEl = $('terms'), dictSearch = $('dictSearch'), dictCount = $('dictCount');
+  var askText = $('askText'), btnAsk = $('btnAsk'), answerQ = $('answerQ'), waiting = $('waiting'), verified = $('verified');
+  var btnAdopt = $('btnAdopt'), btnAddDict = $('btnAddDict');
+  var btnDemo = $('btnDemo'), btnStop = $('btnStop'), btnReset = $('btnReset'), demoBar = $('demoBar');
+
+  /* ---------- data ---------- */
+  var SAMPLES = {
+    form: { src: '폼 미쳤다 ㅋㅋ 오늘 완전 찢었음', out: '오늘 물이 제대로 올랐네, 아주 날아다녔어',
+            mean: '<b>뜻:</b> 실력이 최고조 · <b>분위기:</b> 감탄', en: '<b>EN (Gen Z):</b> he\'s cooking today' },
+    spike:{ src: '이번 릴리즈 스파이크 쳤네요 ㅋㅋ', out: '출시하자마자 반응이 터졌네요 ㅎㅎ',
+            mean: '<b>뜻:</b> 배포 직후 지표 급등 · <b>분위기:</b> 뿌듯함', en: '<b>EN (Gen Z):</b> this release went crazy' }
+  };
+  var CARDS = [
+    { label:'단어 카드 · 20대 말 → 50대 말', word:'찢었다', mean:'뜻: 압도적으로 잘했다', q:'50대 말로는?',
+      opts:[ {t:'물이 올랐다', ok:true}, {t:'큰일 났다', ok:false} ],
+      wrongMsg:'이 뜻은 아니에요 → ‘큰일 났다’는 걱정의 말' },
+    { label:'단어 카드 · 20대/기획팀 말 → 50대/영업팀 말', word:'KPI 터졌어요', mean:'뜻: 목표를 크게 넘겼다', q:'50대/영업팀 말로는?',
+      opts:[ {t:'실적이 아주 잘 나왔어요', ok:true}, {t:'KPI에 문제가 생겼어요', ok:false} ],
+      wrongMsg:'이 뜻은 아니에요 → 여기서 ‘터졌다’는 좋은 쪽이에요' }
+  ];
+  var BASE_TERMS = [
+    { t:'스파이크 치다', m:'배포 후 지표 급등', g:'개발팀', cls:'teal' },
+    { t:'폼 미쳤다', m:'아주 잘했다', g:'20대', cls:'accent' },
+    { t:'짱이다', m:'매우 좋다', g:'전 세대', cls:'' },
+    { t:'킥오프', m:'프로젝트 시작 회의', g:'기획팀', cls:'yellow' }
+  ];
+  var LUCKY = { t:'럭키비키', m:'그래도 다행이다 (가벼운 긍정)', g:'20대 · 검증됨', cls:'teal', isNew:true };
+
+  /* ---------- state ---------- */
+  var state = { screen:null, mode:'type', learnDone:3, card:0, terms:[], adopted:false, autoplay:false, typing:null };
+  var chipDefaults = $$('.chips .chip').map(function(c){ return [c, c.classList.contains('on')]; });
+
+  /* ---------- navigation ---------- */
+  var NO_TABBAR = { 'splash':1, 'onboarding-1':1, 'onboarding-2':1 };
+  function showScreen(id){
+    var next = $(id); if(!next){ return; }
+    screens.forEach(function(s){ s.classList.remove('active'); });
+    next.classList.add('active');
+    next.scrollTop = 0;
+    state.screen = id;
+    if(tabbar){ tabbar.hidden = !!NO_TABBAR[id]; }
+    var tab = next.getAttribute('data-tab') || '';
+    $$('.tab', tabbar).forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-tab') === tab); });
+    if(captionbar){ captionbar.textContent = next.getAttribute('data-caption') || ''; }
+    onEnter(id);
+  }
+  function onEnter(id){
+    if(id === 'splash' && !state.autoplay){ later(function(){ if(state.screen === 'splash'){ showScreen('onboarding-1'); } }, 1200); }
+    if(id === 'community-answer'){
+      if(answerQ && askText){ answerQ.textContent = askText.value.trim() || answerQ.textContent; }
+      if(verified){ verified.hidden = true; }
+      if(waiting){ waiting.hidden = false; }
+      later(function(){ if(state.screen === 'community-answer'){ if(waiting){ waiting.hidden = true; } if(verified){ verified.hidden = false; } } }, 1500);
+    }
+  }
+
+  /* ---------- toast ---------- */
+  var toastTimer = null;
+  function toast(msg){
+    if(!toastEl){ return; }
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    if(toastTimer){ cancel(toastTimer); }
+    toastTimer = later(function(){ toastEl.classList.remove('show'); toastTimer = null; }, 1800);
+  }
+
+  /* ---------- typing effect ---------- */
+  function typeInto(el, text, totalMs, done, asValue){
+    if(!el){ if(done){ done(); } return; }
+    if(state.typing){ cancel(state.typing); state.typing = null; }
+    var i = 0, n = text.length, step = Math.max(18, Math.floor(totalMs / Math.max(1, n)));
+    if(asValue){ el.value = ''; } else { el.textContent = ''; el.classList.add('caret'); }
+    state.typing = every(function(){
+      i++;
+      if(asValue){ el.value = text.slice(0, i); } else { el.textContent = text.slice(0, i); }
+      if(i >= n){ cancel(state.typing); state.typing = null; if(!asValue){ el.classList.remove('caret'); } if(done){ done(); } }
+    }, step);
+  }
+
+  /* ---------- global click delegation ---------- */
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest ? ev.target.closest('[data-go],[data-toast],.chips .chip,.opt,#modes button') : null;
+    if(!t){ return; }
+    if(t.hasAttribute('data-toast')){ toast(t.getAttribute('data-toast')); }
+    if(t.hasAttribute('data-go')){ showScreen(t.getAttribute('data-go')); return; }
+    if(t.classList.contains('chip') && t.parentElement && t.parentElement.classList.contains('chips')){ onChip(t); return; }
+    if(t.classList.contains('opt')){ onOption(t); return; }
+    if(t.parentElement === modes){ setMode(t.getAttribute('data-mode')); return; }
+  });
+  var splash = $('splash');
+  if(splash){ splash.addEventListener('click', function(){ if(!state.autoplay){ showScreen('onboarding-1'); } }); }
+
+  /* ---------- onboarding chips ---------- */
+  function onChip(chip){
+    var group = chip.parentElement;
+    if(group.getAttribute('data-single') === 'true'){
+      $$('.chip', group).forEach(function(c){ c.classList.remove('on'); });
+      chip.classList.add('on');
+    } else {
+      chip.classList.toggle('on');
+      if(!group.querySelector('.chip.on')){ chip.classList.add('on'); }
+    }
+  }
+
+  /* ---------- translate: input modes ---------- */
+  function setMode(mode){
+    if(!mode){ return; }
+    state.mode = mode;
+    $$('button', modes).forEach(function(b){ var on = b.getAttribute('data-mode') === mode; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    if(voicePanel){ voicePanel.hidden = mode !== 'voice'; }
+    if(filePanel){ filePanel.hidden = mode !== 'file'; }
+    if(result){ result.hidden = true; }
+    if(mode === 'voice'){
+      if(voiceStatus){ voiceStatus.textContent = '듣는 중…'; }
+      if(srcText){ srcText.value = ''; srcText.placeholder = '말씀하세요'; }
+      later(function(){
+        if(state.mode !== 'voice'){ return; }
+        if(voiceStatus){ voiceStatus.textContent = '인식 완료'; }
+        typeInto(srcText, SAMPLES.form.src, 2000, null, true);
+      }, 2500);
+    } else if(mode === 'file'){
+      if(srcText){ srcText.value = ''; srcText.placeholder = '녹음 파일을 전사하는 중…'; }
+      if(fileStatus){ fileStatus.textContent = '전사 중…'; }
+      if(fileProg){ fileProg.style.width = '0%'; }
+      var p = 0;
+      var iv = every(function(){
+        if(state.mode !== 'file'){ cancel(iv); return; }
+        p = Math.min(100, p + 9);
+        if(fileProg){ fileProg.style.width = p + '%'; }
+        if(p >= 100){
+          cancel(iv);
+          if(fileStatus){ fileStatus.textContent = '전사 완료: ‘' + SAMPLES.spike.src + '’'; }
+          if(srcText){ srcText.value = SAMPLES.spike.src; }
+        }
+      }, 130);
+    } else {
+      if(srcText){ srcText.placeholder = '상대의 말, 또는 내 말을 입력하세요'; if(!srcText.value){ srcText.value = SAMPLES.form.src; } }
+    }
+  }
+
+  /* ---------- translate: run ---------- */
+  function runTranslate(){
+    if(!srcText){ return; }
+    var text = srcText.value.trim();
+    if(!text){ toast('문장을 먼저 입력해 주세요'); return; }
+    var s = text.indexOf('스파이크') >= 0 ? SAMPLES.spike : SAMPLES.form;
+    if(result){ result.hidden = true; }
+    if(loading){ loading.hidden = false; }
+    if(btnTranslate){ btnTranslate.disabled = true; }
+    later(function(){
+      if(loading){ loading.hidden = true; }
+      if(btnTranslate){ btnTranslate.disabled = false; }
+      if(metaMean){ metaMean.innerHTML = s.mean; }
+      if(metaEn){ metaEn.innerHTML = s.en; }
+      if(result){ result.hidden = false; result.classList.remove('pop'); void result.offsetWidth; result.classList.add('pop'); }
+      if(captionbar && state.screen === 'translate'){ captionbar.textContent = '③ 뜻풀이가 아니라 상대의 말로'; }
+      typeInto(outText, s.out, 1800);
+      later(function(){ var sc = $('translate'); if(sc && result){ sc.scrollTo({ top: Math.max(0, result.offsetTop - 12), behavior:'smooth' }); } }, 200);
+    }, 600);
+  }
+  if(btnTranslate){ btnTranslate.addEventListener('click', runTranslate); }
+  if(btnCopy){
+    btnCopy.addEventListener('click', function(){
+      var txt = outText ? outText.textContent : '';
+      var ok = function(){ toast('복사했어요'); };
+      var fallback = function(){
+        try{ var r = document.createRange(); r.selectNodeContents(outText); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }catch(e){}
+        toast('길게 눌러 복사하세요');
+      };
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(ok, fallback); } else { fallback(); }
+    });
+  }
+
+  /* ---------- context accordion ---------- */
+  if(accBtn && accBody){
+    accBtn.addEventListener('click', function(){
+      var open = accBtn.getAttribute('aria-expanded') === 'true';
+      accBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      accBody.hidden = open;
+    });
+  }
+
+  /* ---------- learn ---------- */
+  function renderLearn(){
+    if(learnSub){ learnSub.textContent = state.learnDone + '/5 완료 · 연속 7일'; }
+    if(learnProg){ learnProg.style.width = (state.learnDone / 5 * 100) + '%'; }
+  }
+  function renderCard(){
+    var c = CARDS[state.card % CARDS.length];
+    if(flashLabel){ flashLabel.textContent = c.label; }
+    if(flashWord){ flashWord.textContent = c.word; }
+    if(flashMean){ flashMean.textContent = c.mean; }
+    if(flashQ){ flashQ.textContent = c.q; }
+    if(flashOpts){
+      flashOpts.innerHTML = '';
+      c.opts.forEach(function(o){
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'opt'; b.textContent = o.t; b.setAttribute('data-correct', o.ok ? 'true' : 'false');
+        flashOpts.appendChild(b);
+      });
+    }
+    if(flashFeedback){ flashFeedback.textContent = ''; flashFeedback.classList.remove('bad'); }
+    if(btnNextCard){ btnNextCard.hidden = true; }
+    if(flash){ flash.classList.remove('pop'); void flash.offsetWidth; flash.classList.add('pop'); }
+  }
+  function onOption(btn){
+    if(!flashOpts || btn.parentElement !== flashOpts){ return; }
+    if(flashOpts.getAttribute('data-done') === 'true'){ return; }
+    var c = CARDS[state.card % CARDS.length];
+    if(btn.getAttribute('data-correct') === 'true'){
+      btn.classList.add('correct');
+      flashOpts.setAttribute('data-done', 'true');
+      if(flashFeedback){ flashFeedback.textContent = '정답! +10점'; flashFeedback.classList.remove('bad'); }
+      if(state.learnDone < 5){ state.learnDone++; }
+      renderLearn();
+      if(btnNextCard){ btnNextCard.hidden = false; }
+    } else {
+      btn.classList.add('wrong'); btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+      if(flashFeedback){ flashFeedback.textContent = c.wrongMsg; flashFeedback.classList.add('bad'); }
+    }
+  }
+  var btnSentence = $('btnSentence');
+  if(btnSentence){
+    btnSentence.addEventListener('click', function(){
+      state.card = 1; if(flashOpts){ flashOpts.removeAttribute('data-done'); } renderCard();
+      var sc = $('learn'); if(sc){ sc.scrollTo({ top:0, behavior:'smooth' }); }
+      toast('문장 카드를 불러왔어요');
+    });
+  }
+  if(btnNextCard){
+    btnNextCard.addEventListener('click', function(){
+      state.card = (state.card + 1) % CARDS.length;
+      if(flashOpts){ flashOpts.removeAttribute('data-done'); }
+      renderCard();
+      if(state.card === 0 && state.learnDone >= 5){ toast('오늘 학습 완료! 연속 8일째'); }
+    });
+  }
+
+  /* ---------- dictionary ---------- */
+  function renderTerms(){
+    if(!termsEl){ return; }
+    var q = dictSearch ? dictSearch.value.trim().toLowerCase() : '';
+    var list = state.terms.filter(function(x){ return !q || (x.t + ' ' + x.m + ' ' + x.g).toLowerCase().indexOf(q) >= 0; });
+    termsEl.innerHTML = '';
+    if(!list.length){ var e = document.createElement('div'); e.className = 'empty'; e.textContent = '아직 없는 말이에요. 아래에서 질문해 보세요.'; termsEl.appendChild(e); }
+    list.forEach(function(x){
+      var row = document.createElement('div'); row.className = 'term' + (x.isNew ? ' new pop' : '');
+      var body = document.createElement('div'); body.className = 'body';
+      var t = document.createElement('div'); t.className = 't'; t.textContent = x.t;
+      var m = document.createElement('div'); m.className = 'm'; m.textContent = x.m;
+      body.appendChild(t); body.appendChild(m);
+      var tag = document.createElement('span'); tag.className = 'tag ' + (x.cls || ''); tag.textContent = x.g;
+      row.appendChild(body); row.appendChild(tag);
+      termsEl.appendChild(row);
+    });
+    if(dictCount){ dictCount.textContent = String(state.terms.length); }
+  }
+  if(dictSearch){ dictSearch.addEventListener('input', renderTerms); }
+  function addLucky(msg){
+    if(!state.adopted){ state.terms.unshift(LUCKY); state.adopted = true; renderTerms(); }
+    toast(msg);
+  }
+  if(btnAdopt){ btnAdopt.addEventListener('click', function(){ addLucky('채택했어요 · 사전에 반영됩니다'); }); }
+  if(btnAddDict){ btnAddDict.addEventListener('click', function(){ addLucky('사전에 추가했어요'); }); }
+
+  /* ---------- community ---------- */
+  if(btnAsk){ btnAsk.addEventListener('click', function(){ showScreen('community-answer'); }); }
+  var sw = document.querySelector('.switch');
+  if(sw){ sw.addEventListener('click', function(){ sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); }); }
+
+  /* ---------- reset ---------- */
+  function resetState(){
+    clearTimers(); state.typing = null; toastTimer = null;
+    if(toastEl){ toastEl.classList.remove('show'); }
+    chipDefaults.forEach(function(p){ p[0].classList.toggle('on', p[1]); });
+    state.mode = 'type';
+    if(srcText){ srcText.value = SAMPLES.form.src; }
+    $$('button', modes).forEach(function(b){ var on = b.getAttribute('data-mode') === 'type'; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    if(voicePanel){ voicePanel.hidden = true; } if(filePanel){ filePanel.hidden = true; }
+    if(loading){ loading.hidden = true; } if(result){ result.hidden = true; } if(outText){ outText.textContent = ''; outText.classList.remove('caret'); }
+    if(btnTranslate){ btnTranslate.disabled = false; }
+    if(accBtn){ accBtn.setAttribute('aria-expanded', 'false'); } if(accBody){ accBody.hidden = true; }
+    state.learnDone = 3; state.card = 0; if(flashOpts){ flashOpts.removeAttribute('data-done'); }
+    renderLearn(); renderCard();
+    state.terms = BASE_TERMS.slice(); state.adopted = false; if(dictSearch){ dictSearch.value = ''; } renderTerms();
+    if(askText){ askText.value = "'럭키비키'가 뭐예요? 팀 단톡에서 나왔어요"; }
+    if(sw){ sw.setAttribute('aria-checked', 'true'); }
+    if(verified){ verified.hidden = true; } if(waiting){ waiting.hidden = false; }
+  }
+
+  /* ---------- autoplay: the same screens and handlers a person would tap ---------- */
+  function click(el){ if(el){ el.click(); } }
+  // [delayBeforeMs, action]  — total ≈ 45 s
+  var SCRIPT = [
+    [0,    function(){ showScreen('splash'); }],
+    [1500, function(){ showScreen('onboarding-1'); }],
+    [2000, function(){ click(document.querySelector('#onboarding-1 [data-go="onboarding-2"]')); }],
+    [2000, function(){ click(document.querySelector('#onboarding-2 [data-go="translate"]')); }],
+    [600,  function(){ click(modes ? modes.querySelector('[data-mode="voice"]') : null); }],   // 2.5 s wave + 2 s typing
+    [5200, function(){ click(btnTranslate); }],                                                 // 0.6 s dots + 1.8 s typing
+    [6000, function(){ click(document.querySelector('#result [data-go="context"]')); }],
+    [3000, function(){ click(accBtn); }],
+    [3000, function(){ click(tabbar ? tabbar.querySelector('[data-tab="learn"]') : null); }],
+    [1800, function(){ click(flashOpts ? flashOpts.querySelector('[data-correct="true"]') : null); }],
+    [3200, function(){ click(tabbar ? tabbar.querySelector('[data-tab="dictionary"]') : null); }],
+    [2400, function(){ click(document.querySelector('#dictionary [data-go="community-ask"]')); }],
+    [2600, function(){ click(btnAsk); }],                                                       // AI answer now, verified after 1.5 s
+    [5200, function(){ click(btnAdopt); }],
+    [2600, function(){ click(tabbar ? tabbar.querySelector('[data-tab="translate"]') : null); if(captionbar){ captionbar.textContent = '알쓸말 · 아는 척 대신 알아듣기'; } }],
+    [3000, function(){ stopDemo(); }]
+  ];
+  var demoTimer = null, demoStart = 0, demoTotal = SCRIPT.reduce(function(a, s){ return a + s[0]; }, 0), barTimer = null;
+
+  function startDemo(){
+    resetState();
+    state.autoplay = true;
+    if(btnDemo){ btnDemo.hidden = true; } if(btnStop){ btnStop.hidden = false; }
+    if(demoBar){ demoBar.hidden = false; demoBar.style.width = '0%'; }
+    demoStart = Date.now();
+    barTimer = every(function(){
+      var pct = Math.min(100, (Date.now() - demoStart) / demoTotal * 100);
+      if(demoBar){ demoBar.style.width = pct + '%'; }
+    }, 250);
+    var i = 0;
+    function next(){
+      if(!state.autoplay || i >= SCRIPT.length){ return; }
+      var step = SCRIPT[i++];
+      demoTimer = later(function(){ step[1](); next(); }, step[0]);
+    }
+    next();
+  }
+  function stopDemo(){
+    state.autoplay = false;
+    if(demoTimer){ cancel(demoTimer); demoTimer = null; }
+    if(barTimer){ cancel(barTimer); barTimer = null; }
+    if(demoBar){ demoBar.style.width = '100%'; later(function(){ demoBar.hidden = true; demoBar.style.width = '0%'; }, 400); }
+    if(btnDemo){ btnDemo.hidden = false; } if(btnStop){ btnStop.hidden = true; }
+  }
+  if(btnDemo){ btnDemo.addEventListener('click', startDemo); }
+  if(btnStop){ btnStop.addEventListener('click', function(){ stopDemo(); if(captionbar){ captionbar.textContent = '데모를 중지했어요. 직접 눌러 보세요.'; } }); }
+  if(btnReset){ btnReset.addEventListener('click', function(){ resetState(); stopDemo(); showScreen('splash'); }); }
+
+  /* ---------- boot ---------- */
+  resetState();
+  showScreen('splash');
+})();
+</script>
+
+</body></html>
