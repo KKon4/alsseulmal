@@ -1678,6 +1678,7 @@ var ALSS = (function () {
 (function (A) {
   'use strict';
   var MAX_BYTES = 15 * 1024 * 1024, OCR_MAX_PAGES = 5, TEXT_MAX_PAGES = 60, MAX_PIXELS = 40000000, MAX_CHARS = 60000;
+  var OCR_MAX_SIDE = 2400; // 글자 인식에 넘기는 그림의 긴 변 — 더 크면 줄인다 (휴대폰 브라우저의 메모리를 넘기지 않게)
   var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   var PDF_CMAPS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/';
   var TESS = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/';
@@ -1769,7 +1770,8 @@ var ALSS = (function () {
     workerP = loadScript(TESS + 'tesseract.min.js', function () { return !!window.Tesseract; }).then(function () {
       return window.Tesseract.createWorker('kor', 1, {
         workerPath: TESS + 'worker.min.js', corePath: TESS_CORE, langPath: TESS_LANG,
-        logger: function (m) { if (progressFn) { progressFn(m); } }
+        logger: function (m) { if (progressFn) { progressFn(m); } },
+        errorHandler: function () { /* 실패는 아래에서 받아 다시 시도하거나 안내한다 — 도구가 창 밖으로 오류를 던지지 않게 */ }
       });
     }).then(function (w) {
       // 한 단 짜리 글로 읽는다 (서버판의 --psm 4 와 같다)
@@ -1802,7 +1804,7 @@ var ALSS = (function () {
     var w = img.width || img.naturalWidth, h = img.height || img.naturalHeight, scale = 1, c, g, data, px, i, y;
     if (!w || !h) { throw fail('사진을 열 수 없어요. 다른 사진으로 넣어 주세요'); }
     if (w * h > MAX_PIXELS) { throw fail('사진이 너무 커요. 해상도를 낮춰 다시 찍어 주세요'); }
-    if (Math.max(w, h) < 1600) { scale = 2; } else if (Math.max(w, h) > 3200) { scale = 3200 / Math.max(w, h); }
+    if (Math.max(w, h) < 1600) { scale = Math.min(2, OCR_MAX_SIDE / Math.max(w, h)); } else if (Math.max(w, h) > OCR_MAX_SIDE) { scale = OCR_MAX_SIDE / Math.max(w, h); }
     c = document.createElement('canvas'); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
     g = c.getContext('2d', { willReadFrequently: true });
     g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
@@ -1813,9 +1815,27 @@ var ALSS = (function () {
     g.putImageData(data, 0, 0);
     return c;
   }
+  /** 그림을 비율대로 줄인 새 그림 */
+  function shrink(c, ratio) {
+    var s = document.createElement('canvas'), g;
+    s.width = Math.max(1, Math.round(c.width * ratio)); s.height = Math.max(1, Math.round(c.height * ratio));
+    g = s.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.drawImage(c, 0, 0, s.width, s.height);
+    return s;
+  }
+  /** 한 쪽 인식. 인식 도구가 죽으면(기기의 메모리가 모자랄 때 — 주로 휴대폰) 도구를 새로 띄워 더 작은 그림으로 한 번 더 한다 */
+  function recognizeOnce(canvas) {
+    return needOcr().then(function (worker) { return worker.recognize(canvas); }).then(null, function (e) {
+      var dead = workerP;
+      if (e && e.user) { throw e; } // 도구를 내려받지 못함 — 다시 해도 같다
+      workerP = null;
+      if (dead) { dead.then(function (w) { return w.terminate(); }).then(null, function () { /* 이미 죽었다 */ }); }
+      return needOcr().then(function (worker) { return worker.recognize(shrink(canvas, Math.min(1, 1500 / Math.max(canvas.width, canvas.height)))); });
+    });
+  }
   function ocrCanvases(canvases, onProgress) {
     var texts = [], confs = [], i = 0;
-    return needOcr().then(function (worker) {
+    return needOcr().then(function () {
       function next() {
         if (i >= canvases.length) { return null; }
         var page = i++;
@@ -1823,7 +1843,7 @@ var ALSS = (function () {
           if (onProgress && m && m.status === 'recognizing text') { onProgress('글자를 읽는 중… ' + (canvases.length > 1 ? (page + 1) + '/' + canvases.length + '쪽 ' : '') + Math.round((m.progress || 0) * 100) + '%'); }
           else if (onProgress && m && /loading|initializ/.test(m.status || '')) { onProgress('글자 인식 도구를 준비하는 중… (처음 한 번만 내려받아요)'); }
         };
-        return worker.recognize(canvases[page]).then(function (r) {
+        return recognizeOnce(canvases[page]).then(function (r) {
           var lines = (r.data.lines || []).filter(function (l) { return l && l.bbox && typeof l.text === 'string'; });
           var t = tidy(lines.length ? reflow(lines.map(function (l) { return { top: l.bbox.y0, x0: l.bbox.x0, x1: l.bbox.x1, h: Math.max(1, l.bbox.y1 - l.bbox.y0), text: l.text.replace(/\s+/g, ' ') }; })) : (r.data.text || ''));
           if (t) { texts.push(t); confs.push((r.data.confidence || 0) / 100); }
@@ -1949,8 +1969,8 @@ var ALSS = (function () {
           var no = ++j;
           if (onProgress) { onProgress((broken ? 'PDF의 글자 정보가 온전하지 않아요. ' : '스캔한 PDF예요. ') + '쪽을 그림으로 바꾸는 중… ' + no + '/' + m + '쪽'); }
           return pdf.getPage(no).then(function (page) {
-            var vp = page.getViewport({ scale: 200 / 72 }), c = document.createElement('canvas');
-            if (vp.width * vp.height > MAX_PIXELS) { vp = page.getViewport({ scale: 200 / 72 * Math.sqrt(MAX_PIXELS / (vp.width * vp.height)) }); }
+            var base = page.getViewport({ scale: 1 }), c = document.createElement('canvas');
+            var vp = page.getViewport({ scale: Math.min(200 / 72, OCR_MAX_SIDE / Math.max(base.width, base.height)) }); // 200dpi, 긴 변은 OCR_MAX_SIDE 까지
             c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
             return page.render({ canvasContext: c.getContext('2d'), viewport: vp, background: '#fff' }).promise.then(function () { canvases.push(c); return render(); });
           });
